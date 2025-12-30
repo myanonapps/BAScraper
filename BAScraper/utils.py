@@ -109,7 +109,7 @@ async def make_request(service: 'AsyncServices',
                         quit()
 
                     if response.ok:
-                        service.logger.info(
+                        service.logger.debug(
                             f"{coro_name} | pool: {service.pool_amount} | len: {len(result)} | time: {toc - tic:.2f}")
                         await _request_sleep(service, headers=headers)
                         return result
@@ -118,7 +118,8 @@ async def make_request(service: 'AsyncServices',
                         # usually caught by the try/except
                         response_text = await response.text()
                         service.logger.error(f"{coro_name} | {response.status}"
-                                             f"\n{response_text}\n")
+                                             f"\n{response_text}\n"
+                                             f"\n{uri}\n")
                         retries += 1
                         await _request_sleep(service, service.backoff_sec * retries, headers)  # backoff
                         continue
@@ -273,7 +274,9 @@ async def _request_sleep(service: 'AsyncServices',
                     await _request_sleep(service, sleep_sec, headers)
 
             else:
-                raise Exception('`auto-header` is used but ratelimit related header does not exist.')
+                service.logger.warning('`auto-header` is used but ratelimit related header does not exist. Doing manual')
+                await asyncio.sleep(sleep_sec)
+                return
 
         case 'manual':
             await asyncio.sleep(sleep_sec)
