@@ -8,6 +8,7 @@ from zoneinfo import ZoneInfo
 tz = ZoneInfo("UTC")
 from time import perf_counter
 from typing import TYPE_CHECKING, List, TypeVar
+from pathvalidate import sanitize_filename
 
 import aiohttp
 
@@ -167,8 +168,8 @@ async def make_request_time_pagination(service: 'AsyncServices',
     def temp_save(data):
         # saving individual returned results
         temp_fp = os.path.join(service.temp_dir.name,
-                               f'{params['after']}__'
-                               f'{params['before']}.json')
+                               f'{sanitize_filename(params["after"])}__'
+                               f'{sanitize_filename(params["before"])}.json')
         with open(temp_fp, 'w+', encoding='utf-8') as f:
             json.dump(data, f, indent=4)
             service.logger.debug(f'Saved temp file at {temp_fp}')
