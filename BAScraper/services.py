@@ -24,6 +24,9 @@ def is_iso8601(s: str) -> bool:
         return True
     except ValueError:
         return False
+    
+def plusUTCtoZ(s: str) -> bool:
+    return s.replace("+00:00", "Z")
 
 def to_epoch(s: str) -> int:
     dt = datetime.fromisoformat(s)
@@ -261,8 +264,8 @@ class Params:
             'author': define_param(str),
             'subreddit': define_param(str),
             'author_flair_text': define_param(str),
-            'after': define_param(str, is_iso8601),  # ISO 8601
-            'before': define_param(str, is_iso8601),  # ISO 8601
+            'after': define_param(str, is_iso8601, modifications=plusUTCtoZ),  # ISO 8601
+            'before': define_param(str, is_iso8601, modifications=plusUTCtoZ),  # ISO 8601
             # do recommend 'auto', limit = 0 FOR AUTO!
             'limit': define_param(int, lambda x: 0 <= x <= 100, False, lambda x: 'auto' if x == 0 else x),
             'sort': define_param(str, lambda x: x in ('asc', 'desc')),

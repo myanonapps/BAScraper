@@ -175,7 +175,7 @@ async def make_request_time_pagination(service: 'AsyncServices',
 
     def epoch_to_iso(epoch: str | int) -> str:
         if isinstance(epoch, int):
-            return datetime.fromtimestamp(epoch, tz=tz).replace(tzinfo=None).isoformat()
+            return datetime.fromtimestamp(epoch).replace(tzinfo=tz).isoformat()
         else:
             return epoch
 
@@ -430,8 +430,8 @@ def split_range(iso_low: str, iso_high: str, n: int) -> List[list]:
             current_high += 1
             remainder -= 1
         ranges.append([
-            datetime.fromtimestamp(current_low).isoformat(),
-            datetime.fromtimestamp(current_high).isoformat()
+            datetime.fromtimestamp(current_low, tz).isoformat(),
+            datetime.fromtimestamp(current_high, tz).isoformat()
         ])
         current_low = current_high + 1
 

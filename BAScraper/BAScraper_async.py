@@ -4,7 +4,8 @@ import os
 from tempfile import TemporaryDirectory
 from typing import Union, Callable, Optional
 from functools import wraps
-
+from zoneinfo import ZoneInfo
+tz = ZoneInfo("UTC")
 from BAScraper.utils import *
 from .services import Params
 
@@ -219,11 +220,19 @@ class PullPushAsync(BaseAsync):
     def _validate_and_set_params(self, params: dict, mode: str):
         is_single_request = False
         if 'after' in params and 'before' in params:
+            assert params['after'].endswith("Z"), \
+                '`after` needs to be in UTC (Z suffix)'
+            assert params['before'].endswith("Z"), \
+                '`before` needs to be in UTC (Z suffix)'            
             assert iso_to_epoch(params['after']) < iso_to_epoch(params['before']), \
                 '`before` needs to be bigger than `after`'
         elif 'after' in params and 'before' not in params:
-            params['before'] = datetime.now().isoformat()
+            assert params['after'].endswith("Z"), \
+                '`after` needs to be in UTC (Z suffix)'            
+            params['before'] = datetime.now(tz).replace(microsecond=0).isoformat()
         elif 'after' not in params and 'before' in params:
+            assert params['before'].endswith("Z"), \
+                '`before` needs to be in UTC (Z suffix)'               
             self.task_num = 1
             is_single_request = True
         else:
@@ -270,7 +279,7 @@ class ArcticShiftAsync(BaseAsync):
                 assert iso_to_epoch(params['after']) < iso_to_epoch(params['before']), \
                     '`before` needs to be bigger than `after`'
             elif 'after' in params and 'before' not in params:
-                params['before'] = datetime.now().isoformat()
+                params['before'] = datetime.now(tz).replace(microsecond=0).isoformat()
             elif 'after' not in params and 'before' in params:
                 self.task_num = 1
                 is_single_request = True
