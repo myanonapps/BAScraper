@@ -116,22 +116,22 @@ async def make_request(service: 'AsyncServices',
                                     await _request_sleep(service, headers=headers)
                                     return result                                                           
                             except (json.JSONDecodeError, aiohttp.ContentTypeError):
-                                service.logger.warning(f"Warning: Header indicates JSON, but actual data appears to be invalid JSON. -> {response}")
+                                service.logger.warning(f"Content-Type: application/json, but 'data' is invalid JSON. -> {response}")
                             except Exception:
-                                service.logger.exception(f"Warning: Header indicated JSON, but actual data could not be decoded. -> {response}")                     
+                                service.logger.exception(f"Content-Type: application/json, but 'data' could not be decoded. -> {response}")                     
                                 
                         elif 'text/html' in content_type:
                             try: 
                                 response_text = await response.text()
-                                service.logger.warning(f"received HTML response! -> {response_text}")
+                                service.logger.warning(f"Content-Type: text/html, expected application/json. -> {response_text}")
                             except Exception:
-                                service.logger.exception(f"received HTML response! -> {response}")
+                                service.logger.exception(f"Content-Type: text/html, expected application/json. -> {response}")
                         else:
                             try: 
                                 response_text = await response.text()
-                                service.logger.warning(f"The content is unexpected type. Content-Type: {content_type}, Response: {response_text}")
+                                service.logger.warning(f"Content-Type: {content_type}, expected application/json. -> {response_text}")
                             except Exception:
-                                service.logger.exception(f"The content is unexpected type. Content-Type: {content_type}, Response: {response}")
+                                service.logger.exception(f"Content-Type: {content_type}, expected application/json. -> {response}")
 
                     else:
                         try:
