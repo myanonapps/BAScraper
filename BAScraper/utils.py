@@ -96,33 +96,49 @@ async def make_request(service: 'AsyncServices',
             tic = perf_counter()
             async with aiohttp.ClientSession() as session:
                 async with session.get(uri, timeout=service.timeout) as response:
+                    err_msg = ""
                     toc = perf_counter()
                     headers = response.headers
-                    result = await response.json()
 
-                    try:
-                        # sometimes the server experiences internal error,
-                        # response itself is ok but contains no data.
-                        result = result['data']
-                    except KeyError:
-                        service.logger.error(f"received wrong response! (missing 'data' field) -> {response}")
-                        quit()
-
+                    content_type = headers.get('Content-Type', '')
+                        
                     if response.ok:
-                        service.logger.debug(
-                            f"{coro_name} | pool: {service.pool_amount} | len: {len(result)} | time: {toc - tic:.2f}")
-                        await _request_sleep(service, headers=headers)
-                        return result
+                        if 'application/json' in content_type:
+                            try:
+                                result = await response.json()
+                                if "data" not in result:
+                                    # sometimes the server experiences internal error,
+                                    # response itself is ok but contains no data.
+                                    err_msg = "JSON missing 'data' field"
+                                else: 
+                                    result = result['data']
+                                    service.logger.debug(
+                                        f"{coro_name} | pool: {service.pool_amount} | len: {len(result)} | time: {toc - tic:.2f}")
+                                    await _request_sleep(service, headers=headers)
+                                    return result                                                           
+                            except (json.JSONDecodeError, aiohttp.ContentTypeError):
+                                err_msg = "Content-Type: application/json, but 'data' is invalid JSON."
+                            except Exception as e:
+                                service.logger.exception("Couldn't decode json, see exception") 
+                                err_msg = str(e)
+                        elif 'text/html' in content_type:
+                            err_msg = "Content-Type: text/html, expected application/json."                        
+                        else:
+                            err_msg = f"Content-Type: {content_type}, expected application/json."
                     else:
-                        # in case it doesn't raise an exception but still has errors, (cloudflare errors)
-                        # usually caught by the try/except
+                        err_msg = f"{response.status}"                        
+                            
+                    # intentional fall through for all but ok data
+                    try:
                         response_text = await response.text()
-                        service.logger.error(f"{coro_name} | {response.status}"
-                                             f"\n{response_text}\n"
-                                             f"\n{uri}\n")
-                        retries += 1
-                        await _request_sleep(service, service.backoff_sec * retries, headers)  # backoff
-                        continue
+                    except Exception:
+                        service.logger.exception("Couldn't get response text")
+                        response_text = "unavailable, see exception"
+
+                    retries += 1                
+                    service.logger.error(f"{coro_name} | {err_msg}\n{response_text}\n{uri}\n: Retrying... Attempt {retries}/{service.max_retries}")
+                    await _request_sleep(service, service.backoff_sec * retries, headers)  # backoff
+                    continue
 
         except asyncio.TimeoutError as err:
             retries += 1
@@ -136,17 +152,14 @@ async def make_request(service: 'AsyncServices',
                 f"{coro_name} | ClientConnectionError: Retrying... Attempt {retries}/{service.max_retries}")
             await _request_sleep(service, service.backoff_sec * retries)  # backoff
 
-        except (json.decoder.JSONDecodeError, aiohttp.client_exceptions.ContentTypeError) as err:
+        except (aiohttp.ContentTypeError, json.JSONDecodeError, json.decoder.JSONDecodeError, aiohttp.client_exceptions.ContentTypeError) as err:
             retries += 1
-            service.logger.warning(
-                f"{err}\n{coro_name} | JSON Decode Error: Possible malformed response. Retrying... "
-                f"Attempt {retries}/{service.max_retries}")
+            service.logger.warning(f"{err}\n{coro_name} | JSON Decode Error: Retrying...Attempt {retries}/{service.max_retries}")
             await _request_sleep(service, service.backoff_sec * retries)  # backoff
 
         except Exception as err:
             retries += 1
-            service.logger.warning(f'{coro_name} | Unexpected error: \n{err} Retrying... '
-                                   f"Attempt {retries}/{service.max_retries}")
+            service.logger.exception(f"{coro_name} | {err}: Retrying...Attempt {retries}/{service.max_retries}")
             await _request_sleep(service, service.backoff_sec * retries)  # backoff
 
     service.logger.error(f'{coro_name} | failed request attempt. skipping...')
